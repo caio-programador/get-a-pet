@@ -145,4 +145,162 @@ module.exports = class PetController{
         })
 
     }
+
+    static async updatePet(req, res){
+        const token = getToken(req)
+        const user = await getUserByToken(token)
+
+        const id = req.params.id
+
+        if(!ObjectId.isValid(id)){
+            res.status(422).json({message: "Id inválido"})
+            return
+        }
+
+        let pet = await Pet.findById(id)
+
+        if(!pet){
+            res.status(404).json({message: 'Pet não encontrado'})
+            return
+        }
+
+        if(pet.user._id.toString() !== user._id.toString()){
+            res.status(403).json({message: 'Você não tem permissão para remover esse pet'})
+            return
+        }
+
+        const {name,age,weight,color, available} = req.body
+
+        const images = req.files
+
+        const updatedData = {}
+
+        if(name){
+            updatedData.name = name
+        }
+        if(age){
+            updatedData.age = age
+        }
+        if(weight){
+            updatedData.weight = weight
+        }
+        if(color){
+            updatedData.color = color
+        }
+        if(available){
+            updatedData.available = available
+        }
+        if(images){
+            if(images.length !== 0){
+                updatedData.images = []
+                images.map(image => {
+                    updatedData.images.push(image.filename)
+                })
+            }
+        }
+
+        await Pet.findByIdAndUpdate(id, updatedData)
+
+        res.status(200).json({
+            message: 'Pet atualizado com sucesso',
+            pet: updatedData
+        })
+
+    }
+
+    static async schedule(req,res){
+        const id = req.params.id
+
+        if(!ObjectId.isValid(id)){
+            res.status(422).json({message: "Id inválido"})
+            return
+        }
+
+        const pet = await Pet.findById(id)
+
+        if(!pet){
+            res.status(404).json({message: 'Pet não encontrado'})
+            return
+        }
+
+        if(!pet.available){
+            res.status(404).json({message: 'Pet não disponível para adoção'})
+            return
+        }
+
+        const token = getToken(req)
+        const user = await getUserByToken(token)
+
+        if(pet.user._id.equals(user._id)){
+            res.status(422).json({message: 'Você não pode agendar uma visita com seu próprio pet'})
+            return
+        }
+
+        if(pet.adopter){
+            if(pet.adopter._id.equals(user._id)){
+                res.status(422).json({message: 'Você já agendou uma visita com esse pet'})
+                return
+            }
+            res.status(422).json({message: 'Esse pet já possui uma visita agendada'})
+            return
+        }
+
+        pet.adopter = {
+            _id: user._id,
+            name: user.name,
+            image: user.image
+        }
+        await Pet.findByIdAndUpdate(id,pet)
+        res.status(200).json({
+            message: `A visita foi agendada com sucesso, entre em contato com `+
+            `${pet.user.name} pelo telefone ${pet.user.phone}`
+        })
+    }
+    static async concludeAdoption(req,res){
+        const id = req.params.id
+
+        if(!ObjectId.isValid(id)){
+            res.status(422).json({message: "Id inválido"})
+            return
+        }
+
+        const pet = await Pet.findById(id)
+
+        if(!pet){
+            res.status(404).json({message: 'Pet não encontrado'})
+            return
+        }
+
+        if(!pet.available){
+            res.status(404).json({message: 'Pet não disponível para adoção'})
+            return
+        }
+
+        const token = getToken(req)
+        const user = await getUserByToken(token)
+
+        if(!pet.adopter){
+            res.status(422).json({message: 'Você precisa agendar uma visita com o pet'})
+            return
+        }else{
+            if (!pet.adopter._id.equals(user._id)){
+                res.status(422).json({message: 'Não foi você quem agendou a visita'})
+                return
+            }
+        }
+
+
+
+        if(pet.user._id.equals(user._id)){
+            res.status(422).json({message: 'Você não pode concluir a adoção com seu próprio pet'})
+            return
+        }
+
+        pet.available = false
+
+        await Pet.findByIdAndUpdate(id,pet)
+        res.status(200).json({
+            message: "Parabéns! O ciclo de adoção foi encerrado com sucesso"
+        })
+    }
 }
