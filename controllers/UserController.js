@@ -3,7 +3,6 @@ const bcrypt = require('bcryptjs')
 const createUserToken = require("../helpers/createUserToken")
 const getToken = require("../helpers/getToken")
 const jwt = require('jsonwebtoken')
-const { json } = require("express")
 const getUserByToken = require("../helpers/getUserByToken")
 
 module.exports = class UserController{
